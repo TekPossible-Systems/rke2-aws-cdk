@@ -1,0 +1,60 @@
+---
+
+- name: Generate SCC Results and CycloneDX SBOM
+  become: True
+  hosts: 'all'
+  gather_facts: True
+  tasks:
+    - name: Install Distro SBOM Software with PIP
+      ansible.builtin.pip:
+        name: distro2sbom
+    
+    - name: Generate RPM List
+      shell:
+        cmd: |
+          rpm -qa > /root/rpms.txt
+    
+    - name: Run distro2sbom using generated rpm list
+      shell:
+        cmd: |
+          /usr/local/bin/distro2sbom --distro rpm -i /root/rpms.txt --format json -o /root/sbom.json -n RedHat -r 9.x --distro-namespace redhat --sbom cyclonedx    
+    - name: Stage SCC RPM
+      copy:
+        src: "scc.rpm"
+        dest: "/root/scc.rpm"
+    
+    - name: Install SCC RPM
+      dnf: 
+        name: "/root/scc.rpm"
+        disable_gpg_check: True
+        state: installed
+    
+    - name: Copy options.xml file into /opt/scc
+      copy:
+        src: 'options.xml'
+        dest: '/opt/scc/options.xml'
+    
+    - name: Scan with SCC - Start Scan as systemd service
+      shell:
+        cmd: |
+          systemd-run --unit=scc.service /opt/scc/cscc
+
+    - name: Check SCC Scan Status
+      service: 
+        name: 'scc.service'
+      register: results_scc_service
+      until: 'results_scc_service.status.LoadState == "not-found"'
+      retries: 600
+      delay: 5
+    
+    - name: Move sbom into /root/SCC_OUT/Sessions/2*/ and Create Artifact ZIP
+      shell:
+        cmd: |
+          mv /root/sbom.json /root/SCC_OUT/Sessions/2*/
+          cd /root/SCC_OUT/Sessions/2*/
+          zip -r /root/artifact-os-security.zip ./
+    
+    - name: Upload Artifact to S3 bucket
+      shell:
+        cmd: |
+          aws s3 cp /root/artifact-os-security.zip {{ artifact_s3_bucket }}/artifact-os-security.zip 

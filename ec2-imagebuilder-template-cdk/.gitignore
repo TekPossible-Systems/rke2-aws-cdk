@@ -1,0 +1,4 @@
+node_modules
+cdk.out
+config/config.json
+assets/component.yaml

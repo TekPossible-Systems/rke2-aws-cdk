@@ -1,0 +1,61 @@
+---
+
+- name: Assorted pre deployment configurations
+  hosts: 'all'
+  connection: local
+  become: True
+  tasks:
+
+    - name: Install GPG Key AWS - Step 1
+      copy:
+        src: amazon-gpg-key
+        dest: /etc/pki/rpm-gpg/amazon-gpg-key
+
+    - name: Install EPEL Repo
+      dnf: 
+        name: "https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm"
+        disable_gpg_check: true
+        state: installed
+        
+    - name: Install AWS SSM Agent
+      dnf: 
+        name: 'https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm'
+        state: installed
+    
+    - name: Move EFS RPM into place
+      copy:
+        src: "amazon-efs-utils.rpm"
+        dest: "/root/amazon-efs-utils.rpm"
+
+    - name: Install AWS EFS Utils
+      dnf: 
+        name: "/root/amazon-efs-utils.rpm"
+        state: installed
+        disable_gpg_check: true
+
+    - name: Enable AWS SSM Service
+      ansible.builtin.systemd:
+        name: amazon-ssm-agent
+        state: started
+        enabled: true
+
+    - name: Ensure Codedeploy Agent dependency is installed
+      dnf: 
+        name: 'ruby'
+        state: installed
+        
+    - name: Hostname Software dependencies
+      dnf: 
+        name: uuid
+        state: installed
+
+    - name: Update the system
+      dnf: 
+       name: '*'
+       state: latest
+
+    - name: EFS Enforce FIPS for TLS Connections
+      replace:
+        path: "/etc/amazon/efs/efs-utils.conf"
+        regexp: "^.*fips_mode_enabled.*$"
+        replace: "fips_mode_enabled = true"

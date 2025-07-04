@@ -1,0 +1,66 @@
+---
+
+- name: TekPossible Systems Additional STIG Addons
+  hosts: 'all'
+  become: true
+  tasks:
+    - name: Fix Kernel Parameters
+      shell:
+        cmd: |
+          grubby --update-kernel=ALL --args="{{ item }}"
+      loop: 
+        - "vsyscall=none"
+        - "page_poison=1"
+        - "slub_debug=P"
+        - "pti=on"
+        - "audit=1"
+        - "audit_backlog_limit=8192"
+    
+    - name: Install STIG Required Software
+      dnf:
+        name: 
+          - aide
+          - rng-tools
+          - fapolicyd
+          - tmux
+
+    - name: Set status of kdump.service
+      ansible.builtin.systemd:
+        name: kdump.service
+        state: stopped
+        enabled: false
+        masked: true
+    
+    - name: home directory permissions
+      shell:
+        cmd: | 
+          chmod -R 0700 /home/*
+
+    - name: Timeout sessions
+      copy:
+        dest: /etc/profile.d/tmout.sh
+        content: |
+          #!/bin/bash
+          declare -x TMOUT=900
+    
+    - name: Copy template files into place
+      copy:
+       src: "{{ item.src }}"
+       dest: "{{ item.dest }}"
+      loop:
+         - { src: "bashrc", dest: "/etc/bashrc" }
+         - { src: "csh.cshrc", dest: "/etc/csh.cshrc" }
+         - { src: "aide.conf", dest: "/etc/aide.conf" }
+         - { src: "aide-cron", dest: "/etc/cron.daily/aide"}
+
+    - name: Set a cool ascii motd banner
+      copy:
+        dest: '/etc/motd'
+        src: 'motd'
+
+    # I am not sure what RKE2 FIPS 140-2 Compliance needs so I added a lot of caveats to default FIPS which 140-3 in RHEL 9
+    - name: Enable FIPS
+      shell:
+        cmd: |
+          fips-mode-setup --enable
+          update-crypto-policies --set FIPS:NO-ENFORCE-EMS:SHA1:AD-SUPPORT-LEGACY

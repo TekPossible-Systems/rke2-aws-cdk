@@ -1,0 +1,22 @@
+{
+    "stack_name": "MCRIT-FEATHER-RKE2",
+    "ami_parameter": "pillow-rke2-ami-ec2ib-main-ami",
+    "vpc_parameter": "mcrit-feather-vpc",
+    "efs_parameter": "mcrit-feather-efs",
+    "efs_sg_parameter": "mcrit-feather-efs-sg",
+    "elb_parameter": "mcrit-feather-elb",
+    "tailscale_parameter": "mcrit-feather-tailscale",
+    "rke2": {
+        "min_nodes": 5,
+        "max_nodes": 7,
+        "instance_type": "m4.large",
+        "ports": [
+            80,
+            443,
+            6443,
+            9345
+        ]
+    },
+    "account": "767398149384",
+    "region": "us-east-2"
+}

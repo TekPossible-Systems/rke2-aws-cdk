@@ -1,0 +1,8 @@
+---
+
+- name: Apply DISA STIG for RHEL 9
+  hosts: 'all'
+  become: True
+  connection: local
+  roles:
+    - rhel9_stig_v2r4

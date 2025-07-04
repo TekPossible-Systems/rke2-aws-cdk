@@ -1,0 +1,24 @@
+---
+
+- name: Deploy Cloudwatch Agent
+  hosts: 'all'
+  become: True
+  tasks:
+    - name: Install Cloudwatch RPM
+      dnf: 
+        disable_gpg_check: true
+        name: 
+          - "https://amazoncloudwatch-agent.s3.amazonaws.com/redhat/amd64/latest/amazon-cloudwatch-agent.rpm"
+          - "collectd"
+        state: installed
+
+    - name: Copy the Cloudwatch Config Template Into place
+      template:
+        src: "amazon-cloudwatch-agent.json.j2"
+        dest: "/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json"
+
+    - name: Enable Cloudwatch Service for Next Boot
+      systemd:
+        name: "amazon-cloudwatch-agent"
+        state: stopped
+        enabled: true

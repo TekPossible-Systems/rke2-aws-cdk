@@ -1,0 +1,5 @@
+{
+    "yaml.schemas": {
+        "https://json.schemastore.org/yamllint.json": "file:///workspace/git-repos/cloud/ec2-ib-cdk/assets/component.yaml"
+    }
+}

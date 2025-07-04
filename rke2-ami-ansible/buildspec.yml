@@ -1,0 +1,9 @@
+version: 0.2
+phases:
+  install:
+    commands:
+      - bash ./execute_imagebuilder.sh
+
+artifacts:
+  files:
+    - '**/artifact-os-security.zip'

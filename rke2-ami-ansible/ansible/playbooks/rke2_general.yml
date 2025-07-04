@@ -1,0 +1,7 @@
+---
+
+- name: RKE2 General Installation Staging
+  hosts: 'all'
+  become: true
+  roles:
+    - rke2_general

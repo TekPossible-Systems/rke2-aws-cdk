@@ -1,0 +1,25 @@
+---
+
+# Apply DISA STIG
+- ansible.builtin.import_playbook: './stig_rhel.yml'
+
+# Apply custom STIG Addons
+- ansible.builtin.import_playbook: './stig_rhel_addons.yml'
+
+# Software Prerequisites
+- ansible.builtin.import_playbook: './misc_install_settings.yml'
+
+# Setup and install Cloudwatch agent
+- ansible.builtin.import_playbook: './deploy_cloudwatch_agent.yml'
+
+# Kubernetes Setup
+###
+# Okay so the other nodes can all be control nodes, but there needs to be one primary node. How will I determine that node? For now, it will be based on IP address.
+# Lets say the nodes are in the 10.12.0.0/24 subnet. 10.12.0.101 is the first node. There are also nodes 102-104. Each of these nodes will try to SSH into the other one using sockets.
+#  If the socket connection succeeeds, then The host is valid. The ip is then added to a valid node list. 
+# Otherwise, the node is not added. 
+# The list will then be sorted by ASCII value. The host with the lowsest value will be primary. 
+# The other nodes will wait for 5 minutes to be setup. 
+###
+# Run RKE2 General
+- ansible.builtin.import_playbook: './rke2_general.yml'

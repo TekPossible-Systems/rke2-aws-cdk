@@ -1,0 +1,54 @@
+
+- name: Create the rke2 configuration directory
+  file:
+    path: "/etc/rancher/rke2"
+    state: directory
+
+- name: Create the rke2 image storage directory
+  file:
+    path: "/var/lib/rancher/rke2/agent/images/"
+    state: directory
+
+- name: Copy helm into place
+  copy:
+    src: "helm"
+    dest: "/usr/bin/helm"
+    mode: '0755'
+
+- name: Copy repo into place
+  copy:
+    dest: /etc/yum.repos.d/rke2.repo
+    content: |
+      [rancher-rke2-common-latest]
+      name=Rancher RKE2 Common Latest
+      baseurl=https://rpm.rancher.io/rke2/latest/common/centos/9/noarch
+      enabled=1
+      gpgcheck=1
+      gpgkey=https://rpm.rancher.io/public.key
+
+      [rancher-rke2-1-33-latest]
+      name=Rancher RKE2 1.33 Latest
+      baseurl=https://rpm.rancher.io/rke2/latest/1.33/centos/9/x86_64
+      enabled=1
+      gpgcheck=1
+      gpgkey=https://rpm.rancher.io/public.key
+
+- name: clean repo cache
+  shell:
+    cmd: |
+      yum clean all
+
+- name: Install common dependencies for selinux support
+  dnf:
+    name: 
+      - container-selinux
+      - rke2-common
+      - rke2-server
+      - rke2-selinux
+      - iptables
+      - libnetfilter_conntrack
+      - libnfnetlink
+      - libnftnl
+      - ipvsadm
+      - policycoreutils-python-utils
+    state: installed

@@ -1,0 +1,5 @@
+{
+    "stack_name": "MCRIT-FEATHER",
+    "ipAddresses": "10.12.0.0",
+    "ami": { "us-east-2": "ami-0a482bdfdf4a33e61" }
+}

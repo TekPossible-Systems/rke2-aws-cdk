@@ -1,0 +1,59 @@
+name: RKE2RHEL9
+description: RKE2 AMI Setup Component - RHEL9 (PILLOW MCRIT)
+schemaVersion: 1.0
+
+phases:
+  - name: build
+    steps:
+      - name: RHEL9Setup
+        action: ExecuteBash
+        inputs:
+          commands:
+            - export CDK_STACK_BASE_NAME_LOWER="pillow-rke2-ami-ec2ib"
+            - export HOME="/tmp"
+            - dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm unzip zip
+            - dnf clean all
+            - curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /root/awscliv2.zip
+            - cd /root
+            - unzip awscliv2.zip
+            - ./aws/install
+            - ln -s /usr/local/bin/aws /usr/bin/aws
+            - dnf install -y ansible-core git python3-pip wget ruby
+            - dnf update -y
+            - pip3 install git-remote-codecommit
+            - git config --global credential.helper '!aws codecommit credential-helper $@'
+            - git config --global credential.UseHttpPath true
+            - mkdir /staging
+            - cd /staging/
+            - git clone $(aws ssm get-parameter --name $CDK_STACK_BASE_NAME_LOWER-repo --query 'Parameter.Value' | sed 's/"//g')
+            - chown -R $(whoami) ./*
+            - chmod 700 -R ./*
+            - cd ./*ami*
+            - bash ./setup_image.sh
+  - name: test
+    steps:
+      - name: RHEL9Test
+        action: ExecuteBash
+        inputs:
+          commands:
+            - export CDK_STACK_BASE_NAME_LOWER="pillow-rke2-ami-ec2ib"  
+            - export HOME="/tmp"          
+            - dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm unzip zip
+            - dnf clean all
+            - curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /root/awscliv2.zip
+            - cd /root
+            - unzip awscliv2.zip
+            - ./aws/install
+            - dnf install -y ansible-core git python3-pip wget ruby
+            - dnf update -y
+            - pip3 install git-remote-codecommit
+            - git config --global credential.helper '!aws codecommit credential-helper $@'
+            - git config --global credential.UseHttpPath true
+            - rm -rf /staging
+            - mkdir /staging
+            - cd /staging/
+            - git clone $(aws ssm get-parameter --name $CDK_STACK_BASE_NAME_LOWER-repo --query 'Parameter.Value' | sed 's/"//g')
+            - chown -R $(whoami) ./*
+            - chmod 700 -R ./*
+            - cd ./*ami*
+            - bash ./test_image.sh

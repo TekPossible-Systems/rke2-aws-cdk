@@ -1,0 +1,20 @@
+{
+    "stack_name": "PILLOW-RKE2-AMI-EC2IB",
+    "repo": {
+        "name": "pillow-rke2-ami",
+        "emails": [
+            "gkiesecker@tekpossible.com", 
+            "pillow-mcrit@tekpossible.com",
+            "pillow-msup@tekpossible.com"
+        ],
+        "branches": [
+            "main",
+            "msup"
+        ]
+    },
+    "component": {
+        "name": "PILLOW-RKE2-AMI",
+        "version": "1.0.5"
+    },
+    "source_ami": "ami-0a482bdfdf4a33e61"
+}

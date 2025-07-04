@@ -1,0 +1,176 @@
+---
+
+- name: Register IP of primary controller
+  shell:
+    cmd: |
+      python3 /staging/*/rke2_discovery.py
+  register: results_join_ip_port
+
+- name: Disable nm-cloud-setup
+  systemd:
+    name: nm-cloud-setup
+    enabled: false
+    state: stopped
+
+- name: "Set Fact - Is this a new cluster?"
+  set_fact: 
+    new_cluster: true
+  when: "':22' in results_join_ip_port.stdout"
+
+- name: "Set Fact - Is this a new cluster?"
+  set_fact: 
+    new_cluster: false
+  when: "':6443' in results_join_ip_port.stdout"
+
+- name: "Set Fact - Am I the primary node?"
+  ansible.builtin.set_fact:
+    is_primary_node: true
+  when: "ansible_default_ipv4.address in results_join_ip_port.stdout"
+
+- name: "Set Fact - Am I the primary node?"
+  ansible.builtin.set_fact:
+    is_primary_node: false
+  when: "ansible_default_ipv4.address not in results_join_ip_port.stdout"
+
+- name: Pause if I am not the primary server for 2 minutes and this is a new cluster
+  pause:
+    minutes: 2
+  when: new_cluster and not is_primary_node
+
+
+- name: Join Cluster as a Control Plane Node
+  when: not is_primary_node
+  block:
+    - name: Get join IP address
+      ansible.builtin.shell:
+        cmd: :|
+          echo {{ results_join_ip_port.stdout }} | cut -d ':' -f1
+      register: results_join_ip
+
+    - name: Create the RKE2 Configuration file
+      copy:
+        dest: "/etc/rancher/rke2/config.yaml"
+        content: |
+          server: https://{{ results_join_ip.stdout }}:9345
+          token: {{ rke2_join_token }}
+          tls-san:
+            - rke2.cloud.pil.low
+            - {{ ansible_fqdn }}
+            - {{ ansible_default_ipv4.address }}
+            - {{ loadbalancer_ip }}
+
+    - name: Load IPVS module and fix selinux boolean
+      ansible.builtin.shell:
+        cmd: |
+          modprobe -i ip_vs
+          /sbin/semanage boolean -m domain_kernel_load_modules --on
+
+    - name: Start up rke2-server
+      ansible.builtin.systemd:
+        name: rke2-server
+        state: started
+        enabled: true
+
+    - name: Create kubeconfig dir
+      file:
+        path: "/root/.kube"
+        state: directory
+    
+    - name: Copy in the kubeconfig from rke2
+      ansible.builtin.shell:
+        cmd: |
+          cp /etc/rancher/rke2/rke2.yaml /root/.kube/config
+          
+- name: Join Cluster as the Initial Node
+  when: is_primary_node 
+  block:
+    - name: Create the RKE2 Configuration file
+      copy:
+        dest: "/etc/rancher/rke2/config.yaml"
+        content: |
+          token: {{ rke2_join_token }}
+          tls-san:
+            - rke2.cloud.pil.low
+            - {{ ansible_fqdn }}
+            - {{ ansible_default_ipv4.address }}
+            - {{ loadbalancer_ip }}
+
+    - name: Load IPVS module and fix selinux boolean
+      ansible.builtin.shell:
+        cmd: |
+          modprobe -i ip_vs
+          /sbin/semanage boolean -m domain_kernel_load_modules --on
+
+    - name: Start up rke2-server
+      ansible.builtin.systemd:
+        name: rke2-server
+        state: started
+        enabled: true
+    - name: Create kubeconfig dir - root
+      file:
+        path: "/root/.kube"
+        state: directory
+
+    - name: Create kubeconfig dir - ssm-user
+      file:
+        path: "/home/ssm-user/.kube"
+        state: directory
+        owner: "1001"
+        group: "1001"
+
+    - name: Create kubeconfig dir - ec2-user
+      file:
+        path: "/home/ec2-user/.kube"
+        state: directory
+        owner: "1000"
+        group: "1000"
+
+    - name: Copy in the kubeconfig from rke2
+      ansible.builtin.shell:
+        cmd: |
+          cp /etc/rancher/rke2/rke2.yaml /root/.kube/config
+          cp /etc/rancher/rke2/rke2.yaml /home/ssm-user/.kube/config
+          cp /etc/rancher/rke2/rke2.yaml /home/ec2-user/.kube/config
+          chown 1001:1001 -R /home/ssm-user/.kube
+          chown 1000:1000 -R /home/ec2-user/.kube
+          cp /etc/rancher/rke2/rke2.yaml /tmp/rke2.yaml
+          sed -i 's/127.0.0.1/{{ loadbalancer_ip }}/g' /tmp/rke2.yaml
+          aws s3 cp /tmp/rke2.yaml {{ artifact_s3_bucket }}/kubeconfig
+
+    - name: Create kubectl symlink
+      file:
+        src: "/var/lib/rancher/rke2/bin/kubectl"
+        dest: "/usr/bin/kubectl"
+        state: link
+
+- name: Setup Cluster Services as Initial Node
+  when: is_primary_node 
+  block:
+    - name: Wait for other nodes to join the cluster
+      pause:
+        minutes: 2
+
+    - name: Install Preliminary Helm Charts
+      shell:
+        cmd:  |
+          cd /staging/*/helm
+          helm upgrade --install {{ item.helm_name }} --create-namespace -n {{ item.namespace }}  {{ item.helm_tar }} -f {{ item.helm_value }}  --kubeconfig /etc/rancher/rke2/rke2.yaml
+      loop:
+        - {
+          "helm_tar": "cert-manager-v1.17.1.tgz",
+          "helm_name":"cert-manager",
+          "helm_value": "cert-manager.yaml",
+          "namespace": "cert-manager"
+        }
+        - {
+          "helm_tar": "argo-cd-8.1.2.tgz",
+          "helm_name":"argocd",
+          "helm_value": "argocd.yaml",
+          "namespace": "argocd"
+        }
+        - {
+          "helm_tar": "rancher-2.11.2.tgz",
+          "helm_name":"rancher",
+          "helm_value": "rancher-ui.yaml",
+          "namespace": "cattle-system"
+        }

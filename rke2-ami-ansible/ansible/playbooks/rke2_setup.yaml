@@ -1,0 +1,7 @@
+---
+
+- name: RKE2 AWS Installation
+  become: true
+  hosts: 'all'
+  roles:
+    - rke2_setup
