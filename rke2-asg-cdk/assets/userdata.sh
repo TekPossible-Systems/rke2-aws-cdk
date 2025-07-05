@@ -21,5 +21,5 @@ cd /staging/*/ansible
 
 sed -i "s/LOADBALANCER_HERE/$ELB_IP/g" ./inventory/localsetup/hosts.yml
 sed -i 's/TAILSCALE_SERVER/TAILSCALE_IP/g' ../rke2_discovery.py
-
+sed -i 's/REPLACE_ME_FSID/EFS_FSID/g' ../helm/efs-csi.yaml
 ansible-playbook playbooks/rke2_setup.yaml -c local -vv -i inventory/localsetup

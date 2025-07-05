@@ -56,17 +56,18 @@ function create_iam_role(scope: Construct, config: any){
     rke2_role.addManagedPolicy(iam.ManagedPolicy.fromManagedPolicyArn(scope, config.stack_name + "-MPROLE_SSM", "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"));
     rke2_role.addManagedPolicy(iam.ManagedPolicy.fromManagedPolicyArn(scope, config.stack_name + "-MPROLE_LOGS", "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"));
     rke2_role.addManagedPolicy(iam.ManagedPolicy.fromManagedPolicyArn(scope, config.stack_name + "-MPROLE_S3", "arn:aws:iam::aws:policy/AmazonS3FullAccess"));
-
+    rke2_role.addManagedPolicy(iam.ManagedPolicy.fromManagedPolicyArn(scope, config.stack_name + "-MPROLE_EFS", "arn:aws:iam::aws:policy/service-role/AmazonEFSCSIDriverPolicy"));
   return(rke2_role);
 
 }
 
-function create_asg(scope: Construct, config: any,  vpc: any, iam_role: any, tailscale_ip: string, elb_dns: string) {
+function create_asg(scope: Construct, config: any,  vpc: any, iam_role: any, tailscale_ip: string, elb_dns: string, efs_fsid: string) {
 
   var rke2_user_data =  ec2.UserData.forLinux({});
   var rke2_user_data_str = readFileSync("./assets/userdata.sh", "utf-8");
   rke2_user_data_str = rke2_user_data_str.replace(/TAILSCALE_IP/g, tailscale_ip);
   rke2_user_data_str = rke2_user_data_str.replace(/LOADBALANCER_RKE/g, elb_dns);
+  rke2_user_data_str = rke2_user_data_str.replace(/EFS_FSID/g, efs_fsid);
 
 
   rke2_user_data.addCommands(rke2_user_data_str);
@@ -158,11 +159,9 @@ export class PillowRKE2 extends cdk.Stack {
 
     var rke2_role = create_iam_role(this, config); // Create the RKE2 Role
 
-    efs_filesystem.grantRootAccess(rke2_role); // Grant the RKE2 Server access to the EFS share
-
     var tailscale_ip: string = ssm.StringParameter.valueFromLookup(this, config.tailscale_parameter, "", {});
 
-    var rke2_asg = create_asg(this, config, vpc, rke2_role, tailscale_ip, nlb.loadBalancerDnsName); // Create RKE2 ASG
+    var rke2_asg = create_asg(this, config, vpc, rke2_role, tailscale_ip, nlb.loadBalancerDnsName, efs_filesystem.fileSystemId); // Create RKE2 ASG
 
     bind_nlb_asg(this, config, rke2_asg, nlb);
     

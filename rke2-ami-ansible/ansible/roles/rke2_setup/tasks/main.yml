@@ -163,6 +163,12 @@
           "namespace": "cert-manager"
         }
         - {
+          "helm_tar": "aws-efs-csi-driver-3.2.0.tgz",
+          "helm_name":"efs",
+          "helm_value": "efs-csi.yaml",
+          "namespace": "efs-system"
+        }
+        - {
           "helm_tar": "argo-cd-8.1.2.tgz",
           "helm_name":"argocd",
           "helm_value": "argocd.yaml",

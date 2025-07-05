@@ -91,7 +91,7 @@ export class PillowCoreStack extends cdk.Stack {
 
     var efs_volume = new efs.FileSystem(this, config.stack_name + "EFS_FS", {
       vpc: vpc, 
-      allowAnonymousAccess: false, // We want authenticated read/write - might need to change this for RKE2 support be we will see...
+      allowAnonymousAccess: true,
       oneZone: true,
       encrypted: true, // FIPS 140-3 Appears to be supported which is cool - Thanks AWS!
       fileSystemName: config.stack_name + "efs-k8s", // This is not the mount path on the EFS side, just the name of the share

@@ -58,9 +58,9 @@
         dest: '/etc/motd'
         src: 'motd'
 
-    # I am not sure what RKE2 FIPS 140-2 Compliance needs so I added a lot of caveats to default FIPS which 140-3 in RHEL 9
-    - name: Enable FIPS
+    # EFS was not working with FIPS 140-3, specifically with the efs-csi
+    - name: Disable FIPS to fix EFS-CSI
       shell:
         cmd: |
-          fips-mode-setup --enable
-          update-crypto-policies --set FIPS:NO-ENFORCE-EMS:SHA1:AD-SUPPORT-LEGACY
+          fips-mode-setup --disable
+          update-crypto-policies --set DEFAULT
