@@ -9,13 +9,14 @@
     "rke2": {
         "min_nodes": 5,
         "max_nodes": 7,
-        "instance_type": "m4.large",
+        "instance_type": "c7i-flex.2xlarge",
         "ports": [
             80,
             443,
             6443,
             9345
-        ]
+        ],
+        "manifest_rke2_repo_name": "mcrit-pillow-manifests"
     },
     "account": "767398149384",
     "region": "us-east-2"

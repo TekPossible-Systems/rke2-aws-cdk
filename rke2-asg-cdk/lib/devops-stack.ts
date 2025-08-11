@@ -57,6 +57,7 @@ function create_iam_role(scope: Construct, config: any){
     rke2_role.addManagedPolicy(iam.ManagedPolicy.fromManagedPolicyArn(scope, config.stack_name + "-MPROLE_LOGS", "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"));
     rke2_role.addManagedPolicy(iam.ManagedPolicy.fromManagedPolicyArn(scope, config.stack_name + "-MPROLE_S3", "arn:aws:iam::aws:policy/AmazonS3FullAccess"));
     rke2_role.addManagedPolicy(iam.ManagedPolicy.fromManagedPolicyArn(scope, config.stack_name + "-MPROLE_EFS", "arn:aws:iam::aws:policy/service-role/AmazonEFSCSIDriverPolicy"));
+    rke2_role.addManagedPolicy(iam.ManagedPolicy.fromManagedPolicyArn(scope, config.stack_name + "-MPROLE_CODE", "arn:aws:iam::aws:policy/AWSCodeCommitFullAccess"));
   return(rke2_role);
 
 }
@@ -66,6 +67,8 @@ function create_asg(scope: Construct, config: any,  vpc: any, iam_role: any, tai
   var rke2_user_data =  ec2.UserData.forLinux({});
   var rke2_user_data_str = readFileSync("./assets/userdata.sh", "utf-8");
   rke2_user_data_str = rke2_user_data_str.replace(/TAILSCALE_IP/g, tailscale_ip);
+  rke2_user_data_str = rke2_user_data_str.replace(/MANIFEST_REPO_HERE/g, config.rke2.manifest_rke2_repo_name);
+  rke2_user_data_str = rke2_user_data_str.replace(/REGION/g, config.region);
   rke2_user_data_str = rke2_user_data_str.replace(/LOADBALANCER_RKE/g, elb_dns);
   rke2_user_data_str = rke2_user_data_str.replace(/EFS_FSID/g, efs_fsid);
 
@@ -114,7 +117,13 @@ function create_asg(scope: Construct, config: any,  vpc: any, iam_role: any, tai
     autoScalingGroupName: config.stack_name + "-RKE2-ASG",
     launchTemplate: rke2_launch,
     maxCapacity: config['rke2']['max_nodes'],
-    minCapacity: config['rke2']['min_nodes']
+    minCapacity: config['rke2']['min_nodes'],
+    updatePolicy: autoscaling.UpdatePolicy.rollingUpdate({
+      maxBatchSize: 2,
+      minInstancesInService: 1,
+      pauseTime: cdk.Duration.seconds(15),
+      minSuccessPercentage: 75
+    })
   });
   return(asg);
 }

@@ -5,7 +5,7 @@
 # import AWS GPG key 
 sudo rpm --import /etc/pki/rpm-gpg/amazon-gpg-key
 
-sudo dnf install -y bind-utils 
+sudo dnf install -y bind-utils btop vim neovim
 ELB_IP=$(host LOADBALANCER_RKE | grep 'has address' | awk '{print $4}' | tail -n 1)
 
 sudo ip route add 10.11.0.0/16 via TAILSCALE_IP
@@ -19,7 +19,18 @@ sudo systemctl enable --now amazon-ssm-agent
 
 cd /staging/*/ansible
 
+# GIT CLONE DOWN MANIFESTS
+ln -s /usr/local/bin/git-remote-codecommit /usr/bin/git-remote-codecommit
+git clone codecommit::REGION://MANIFEST_REPO_HERE 
+
+# Change Values for Ansible/RKE2 Manifests
 sed -i "s/LOADBALANCER_HERE/$ELB_IP/g" ./inventory/localsetup/hosts.yml
 sed -i 's/TAILSCALE_SERVER/TAILSCALE_IP/g' ../rke2_discovery.py
-sed -i 's/REPLACE_ME_FSID/EFS_FSID/g' ../helm/efs-csi.yaml
+sed -i 's/REPLACE_ME_FSID/EFS_FSID/g' ./MANIFEST_REPO_HERE/efs-csi.yaml
 ansible-playbook playbooks/rke2_setup.yaml -c local -vv -i inventory/localsetup
+
+# Apply RKE2 Manifests
+if [ -f /usr/bin/helm ]; then
+    cd ./MANIFEST_REPO_HERE
+    bash ./install_manifests.sh
+fi

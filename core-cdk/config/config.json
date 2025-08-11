@@ -1,5 +1,16 @@
 {
     "stack_name": "MCRIT-FEATHER",
     "ipAddresses": "10.12.0.0",
-    "ami": { "us-east-2": "ami-0a482bdfdf4a33e61" }
+    "ami": { "us-east-2": "ami-0a482bdfdf4a33e61" },
+    "ipa": {
+        "server": "mcrit-idm01.hq.pil.low",
+        "domain": "hq.pil.low",
+        "secret_id": "mcrit-pillow/idm/authentication",
+        "user_secret_key": "username",
+        "pass_secret_key": "password"
+    },
+    "tailscale": {
+        "secret_id": "mcrit-pillow/tailscale/api-key",
+        "secret_key": "tailscale_secret"
+    }
 }

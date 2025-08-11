@@ -19,7 +19,7 @@ import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as efs from 'aws-cdk-lib/aws-efs';
 import * as elb from 'aws-cdk-lib/aws-elasticloadbalancingv2';
 import { VpcEndpointServiceDomainName } from 'aws-cdk-lib/aws-route53';
-
+import * as secretmanager from 'aws-cdk-lib/aws-secretsmanager';
 
 
 /*
@@ -120,25 +120,7 @@ export class PillowCoreStack extends cdk.Stack {
 
     tailscale_iam_role.addManagedPolicy(iam.ManagedPolicy.fromManagedPolicyArn(this, config.stack_name + "-MPROLE_SSM", "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"));
     tailscale_iam_role.addManagedPolicy(iam.ManagedPolicy.fromManagedPolicyArn(this, config.stack_name + "-MPROLE_LOGS", "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"));
-   
-
-    var tailscale_user_data_str = readFileSync("./assets/userdata.sh", "utf-8");
-    tailscale_user_data_str = tailscale_user_data_str.replace("ROUTES", config.ipAddresses + "/16");
-    var tailscale_user_data = ec2.UserData.forLinux({});
-    tailscale_user_data.addCommands(tailscale_user_data_str);
-
-
-    var tailscale =  new ec2.Instance(this, config.stack_name + "Tailscale", {
-      vpc: vpc, 
-      vpcSubnets: vpc.selectSubnets({subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS}),
-      machineImage: ec2.MachineImage.genericLinux(config.ami),
-      instanceType: ec2.InstanceType.of(ec2.InstanceClass.T2, ec2.InstanceSize.MEDIUM),
-      securityGroup: tailscale_security_group, // The NLB Security Group actually works great here, since it allows all ports/protocols from the VPC to talk to it
-      userData: tailscale_user_data,
-      role: tailscale_iam_role,
-      instanceName: config.stack_name + "-Tailscale"
-    });
-
+    tailscale_iam_role.addManagedPolicy(iam.ManagedPolicy.fromManagedPolicyArn(this, config.stack_name + "-MPROLE_SECRET", "arn:aws:iam::aws:policy/SecretsManagerReadWrite"));
     // Create NLB and Bind the ID of it to an SSM parameter
     var nlb = new elb.NetworkLoadBalancer(this, config.stack_name, {
       vpc: vpc, 
@@ -154,8 +136,34 @@ export class PillowCoreStack extends cdk.Stack {
       parameterName: config.stack_name.toLowerCase() + '-elb',
       stringValue: nlb.loadBalancerArn
     });
+    
+    var tailscale_user_data_str = readFileSync("./assets/userdata.sh", "utf-8");
+    tailscale_user_data_str = tailscale_user_data_str.replace("ROUTES", config.ipAddresses + "/16");
+    tailscale_user_data_str = tailscale_user_data_str.replace(/IPA_SERVER/g, config.ipa.server);
+    tailscale_user_data_str = tailscale_user_data_str.replace(/IDM_SECRET_ID/g, config.ipa.secret_id);
+    tailscale_user_data_str = tailscale_user_data_str.replace(/IDM_USER_SECRET_KEY/g, config.ipa.user_secret_key);
+    tailscale_user_data_str = tailscale_user_data_str.replace(/IDM_PASS_SECRET_KEY/g, config.ipa.pass_secret_key);
+    tailscale_user_data_str = tailscale_user_data_str.replace("IPA_DOMAIN", config.ipa.domain);
+    tailscale_user_data_str = tailscale_user_data_str.replace("ELB_DNS", nlb.loadBalancerDnsName);
+    tailscale_user_data_str = tailscale_user_data_str.replace(/TAILSCALE_SECRET_ID/g, config.tailscale.secret_id);
+    tailscale_user_data_str = tailscale_user_data_str.replace(/TAILSCALE_SECRET_KEY/g, config.tailscale.secret_key);
 
 
+    var tailscale_user_data = ec2.UserData.forLinux({});
+    tailscale_user_data.addCommands(tailscale_user_data_str);
+
+
+    var tailscale =  new ec2.Instance(this, config.stack_name + "Tailscale", {
+      vpc: vpc, 
+      vpcSubnets: vpc.selectSubnets({subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS}),
+      machineImage: ec2.MachineImage.genericLinux(config.ami),
+      instanceType: ec2.InstanceType.of(ec2.InstanceClass.T2, ec2.InstanceSize.MEDIUM),
+      securityGroup: tailscale_security_group, // The NLB Security Group actually works great here, since it allows all ports/protocols from the VPC to talk to it
+      userData: tailscale_user_data,
+      role: tailscale_iam_role,
+      instanceName: config.stack_name + "-Tailscale",
+      sourceDestCheck: false // Turning on source/dest check breaks tailscale subnet routers in the VPC side
+    });
 
     const ssm_parameter_tailscale = new ssm.StringParameter(this, config.stack_name + "-TailscaleSSMParameter", { // Create an SSM Parameter for the CodeCommit GRC Clone URL
       parameterName: config.stack_name.toLowerCase() + '-tailscale',
